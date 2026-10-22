@@ -22,5 +22,8 @@ jobs:
       - name: Load this OS's keyboard backend
         run: python -c "from typofix.platforms import get_backend; b = get_backend(); print(b.name, b.KeyHook)"
       - name: Start the whole app (window, bubble, tray icon) and quit
-        run: python tests/smoke_app.py
+        shell: bash
+        run: |
+          python tests/smoke_app.py 2>&1 | tee smoke.log
+          ! grep -q Traceback smoke.log  # errors the app caught still count
         timeout-minutes: 2

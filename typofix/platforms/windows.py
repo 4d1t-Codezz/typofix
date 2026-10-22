@@ -375,6 +375,8 @@ class TrayIcon:
         self.icons = {p: user32.LoadImageW(None, os.path.join(data, name), 1, 16, 16, 0x10)  # LR_LOADFROMFILE
                       for p, name in ((False, "Typofix.ico"), (True, "TypofixPaused.ico"))}
         self.paused = False
+        # Set before the window exists: Windows sends it messages while CreateWindowExW runs.
+        self.taskbar_created = user32.RegisterWindowMessageW("TaskbarCreated")
         self._proc = WNDPROC(self._wndproc)
         hinst = kernel32.GetModuleHandleW(None)
         wc = WNDCLASSW(lpfnWndProc=self._proc, hInstance=hinst, lpszClassName="TypofixTray")
@@ -382,7 +384,6 @@ class TrayIcon:
         # A plain hidden window (not message-only) so it can take the foreground for the menu.
         self.hwnd = user32.CreateWindowExW(0, "TypofixTray", "Typofix", 0x80000000, 0, 0, 0, 0,  # WS_POPUP
                                            None, None, hinst, None)
-        self.taskbar_created = user32.RegisterWindowMessageW("TaskbarCreated")
         self._notify(NIM_ADD)
 
     def _data(self):
