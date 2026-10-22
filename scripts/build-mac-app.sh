@@ -1,7 +1,10 @@
 #!/bin/bash
-# Builds "dist/Typofix.app", a double-clickable app that bundles the code and runs it with the
-# Python you build it with. Most people should double-click "Install on Mac.command" instead,
-# which runs this and puts the app in Applications.
+# Builds "dist/Typofix.app", a double-clickable app that runs Typofix with the Python you build
+# it with, and copies the code to ~/Library/Application Support/Typofix/app, where the app runs it
+# from. Keeping the code out of the bundle means the bundle (and so its code signature) stays the
+# same between versions, and macOS keeps Typofix's Accessibility permission when you update.
+# Most people should double-click "Install on Mac.command" instead, which runs this and puts the
+# app in Applications.
 # Usage:  ./scripts/build-mac-app.sh  [path/to/python3]
 # Exits with status 2 when no suitable Python is found.
 set -euo pipefail
@@ -34,11 +37,16 @@ else
 fi
 echo "Using $PY"
 
+CODE="$HOME/Library/Application Support/Typofix/app"
+mkdir -p "$CODE"
+rm -rf "$CODE/typofix"
+cp -R "$REPO/typofix" "$CODE/"
+find "$CODE" -name "__pycache__" -type d -prune -exec rm -rf {} +
+echo "Code: $CODE"
+
 APP="$REPO/dist/Typofix.app"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/app"
-cp -R "$REPO/typofix" "$APP/Contents/Resources/app/"
-find "$APP/Contents/Resources/app" -name "__pycache__" -type d -prune -exec rm -rf {} +
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$REPO/assets/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 # The launcher runs Python inside the app's own process, so macOS files the Accessibility
@@ -54,8 +62,8 @@ else
   echo "permission under python3 instead of Typofix." >&2
   cat > "$APP/Contents/MacOS/Typofix" <<EOF
 #!/bin/bash
-cd "\$(dirname "\$0")/../Resources/app"
-export TYPOFIX_APP="\$(cd ../../.. && pwd)"
+export TYPOFIX_APP="\$(cd "\$(dirname "\$0")/../.." && pwd)"
+cd "\$HOME/Library/Application Support/Typofix/app"
 exec "$PY" -m typofix "\$@"
 EOF
   chmod +x "$APP/Contents/MacOS/Typofix"

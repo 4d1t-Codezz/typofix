@@ -3,6 +3,10 @@
  * launcher would pass that request to python3, and switching Typofix on in System Settings would
  * then do nothing.
  *
+ * The Python code lives in ~/Library/Application Support/Typofix/app, not in the bundle. macOS ties
+ * the Accessibility permission to the exact bundle (its code signature), so keeping the bundle the
+ * same from one version to the next means updating Typofix doesn't lose the permission.
+ *
  * build-mac-app.sh compiles this with LIBPYTHON (the Python shared library) and PYTHONHOME_DIR
  * (that Python's sys.base_prefix) baked in. */
 
@@ -21,12 +25,14 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Typofix: can't find its own location\n");
         return 1;
     }
-    /* real is .../Typofix.app/Contents/MacOS/Typofix; the code is in Contents/Resources/app. */
+    /* real is .../Typofix.app/Contents/MacOS/Typofix. */
     char *slash = strrchr(real, '/');
     if (!slash) return 1;
     *slash = '\0';
+    const char *home = getenv("HOME");
+    if (!home) return 1;
     char app_dir[PATH_MAX], bundle[PATH_MAX], bundle_real[PATH_MAX];
-    snprintf(app_dir, sizeof app_dir, "%s/../Resources/app", real);
+    snprintf(app_dir, sizeof app_dir, "%s/Library/Application Support/Typofix/app", home);
     snprintf(bundle, sizeof bundle, "%s/../..", real);
     if (chdir(app_dir) != 0) {
         fprintf(stderr, "Typofix: can't open %s\n", app_dir);

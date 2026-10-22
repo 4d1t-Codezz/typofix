@@ -35,6 +35,10 @@ fi
 if [ -w /Applications ]; then DEST=/Applications; else DEST="$HOME/Applications"; fi
 mkdir -p "$DEST"
 osascript -e 'quit app "Typofix"' >/dev/null 2>&1
+for _ in $(seq 40); do  # wait for it to finish quitting, or opening the new copy fails
+  pgrep -f "Typofix.app/Contents/MacOS/Typofix" >/dev/null || break
+  sleep 0.25
+done
 rm -rf "$DEST/Typofix.app"
 cp -R "dist/Typofix.app" "$DEST/"
 
@@ -45,6 +49,6 @@ echo "The first time, macOS asks for Accessibility access (so Typofix can fix wh
 echo "Turn Typofix on in System Settings > Privacy & Security > Accessibility."
 echo "Typofix starts working by itself as soon as you do."
 echo
-echo "If you're updating: macOS treats the new build as a different app. Select Typofix in that"
-echo "list, remove it with the minus button, then turn the new one on."
+echo "Already allowed an older copy and it still asks? Click Reset permission in Typofix's window,"
+echo "then turn Typofix on again. Updates after this one keep the permission."
 open "$DEST/Typofix.app"

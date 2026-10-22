@@ -151,6 +151,12 @@ class App:
         if not self.hook:
             self.root.after(1500, self.try_start)  # starts by itself once access is granted
 
+    def reset_permission(self):
+        if not self.backend.reset_permission():
+            messagebox.showinfo("Typofix", "macOS didn't allow the reset. In System Settings → Privacy & "
+                                           "Security → Accessibility, select Typofix, click −, then open "
+                                           "Typofix again and allow it.")
+
     def set_enabled(self, on):
         self.tracker.enabled = on
         if not on:

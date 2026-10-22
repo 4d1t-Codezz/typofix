@@ -33,8 +33,11 @@ the moment you press space. It works on **macOS** and **Windows**.
 **3. Mac only: allow Accessibility.** macOS asks the first time. Turn **Typofix** on in
 **System Settings → Privacy & Security → Accessibility**, and Typofix starts working right away.
 
-> **Updated and it's asking again?** macOS treats each new build as a different app. In that
-> list, select **Typofix**, click **−** to remove it, then turn the new one on.
+> **Turned it on but it still asks?** That switch belongs to an older copy macOS no longer
+> recognizes. Click **Reset permission** in Typofix's window, then turn Typofix on again. (Or in
+> that list, select **Typofix**, click **−**, and reopen Typofix.) Updating Typofix keeps the
+> permission: the app runs its code from `~/Library/Application Support/Typofix/app`, so the app
+> itself, which is what macOS approves, stays the same between versions.
 
 If macOS says the installer "can't be opened", right-click it, choose **Open**, then **Open** again.
 

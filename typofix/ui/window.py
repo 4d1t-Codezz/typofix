@@ -61,9 +61,15 @@ class MainWindow:
         self.detail = tk.Label(self.status, bg=C["raised"], fg=C["muted"], font=(T.FONT, 10), anchor="w",
                                justify="left", wraplength=inner_w)
         self.detail.pack(fill="x", pady=(int(4 * s), 0))
-        self.settings_btn = Button(self.status, "Open System Settings", app.backend.open_permission_settings,
+        self.fix_row = tk.Frame(self.status, bg=C["raised"])
+        self.settings_btn = Button(self.fix_row, "Open System Settings", app.backend.open_permission_settings,
                                    kind="primary", scale=s)
         self.settings_btn.configure(bg=C["raised"])
+        self.settings_btn.pack(side="left")
+        if app.backend.can_reset_permission:
+            reset = Button(self.fix_row, "Reset permission", app.reset_permission, scale=s)
+            reset.configure(bg=C["raised"])
+            reset.pack(side="left", padx=(int(4 * s), 0))
         self.pulse = Value(Tweens(self.dot), "pulse", self._draw_dot)
 
         # Recent fixes.
@@ -160,22 +166,22 @@ class MainWindow:
             self.dot_color = C["warn"]
             self.headline.configure(text="One more step")
             self.detail.configure(text=app.problem)
-            self.settings_btn.pack(anchor="w", pady=(int(8 * self.s), 0))
+            self.fix_row.pack(anchor="w", pady=(int(8 * self.s), 0))
         elif not app.hook:
             self.dot_color = C["faint"]
             self.headline.configure(text="Starting…")
             self.detail.configure(text="")
-            self.settings_btn.pack_forget()
+            self.fix_row.pack_forget()
         elif app.tracker.enabled:
             self.dot_color = C["ok"]
             self.headline.configure(text="On")
             self.detail.configure(text="Fixing typos in every app as you type.")
-            self.settings_btn.pack_forget()
+            self.fix_row.pack_forget()
         else:
             self.dot_color = C["faint"]
             self.headline.configure(text="Paused")
             self.detail.configure(text="Your typing is left exactly as it is.")
-            self.settings_btn.pack_forget()
+            self.fix_row.pack_forget()
         self.switch.set(app.tracker.enabled, enabled=bool(app.hook))
         self._draw_dot()
         self.chips.set(app.speller.user_words)

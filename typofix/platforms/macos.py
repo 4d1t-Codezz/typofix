@@ -531,10 +531,23 @@ class Backend:
             _cg.AXIsProcessTrustedWithOptions(opts)
             _cf.CFRelease(opts)
         return ("Typofix needs Accessibility access to fix your typing. Turn Typofix on in "
-                "System Settings → Privacy & Security → Accessibility.")
+                "System Settings → Privacy & Security → Accessibility.\n\nAlready on there? That's "
+                "an older copy macOS no longer recognizes. Click Reset permission, then turn "
+                "Typofix on again.")
 
     def open_permission_settings(self):
         subprocess.Popen(["open", SETTINGS_URL])
+
+    can_reset_permission = True
+
+    def reset_permission(self):
+        """Clears Typofix's old Accessibility entry so macOS asks again for this copy.
+        Returns False if macOS wouldn't let us."""
+        done = subprocess.run(["tccutil", "reset", "Accessibility", "local.typofix"],
+                              capture_output=True).returncode == 0
+        self.permission_problem(prompt=True)
+        self.open_permission_settings()
+        return done
 
     # -- open at login, via a LaunchAgent that opens the app bundle
     def app_path(self):

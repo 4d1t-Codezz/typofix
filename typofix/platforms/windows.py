@@ -508,6 +508,8 @@ class Backend:
     def open_permission_settings(self):
         pass
 
+    can_reset_permission = False
+
     # -- open at login, via a shortcut in the Startup folder
     def app_path(self):
         return REPO
