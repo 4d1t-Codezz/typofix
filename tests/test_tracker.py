@@ -1,0 +1,84 @@
+"""Types into a pretend text box and checks what ends up on screen."""
+
+import unittest
+
+from typofix.speller import Speller
+from typofix.tracker import Tracker
+
+SPELLER = Speller()
+
+
+class Box:
+    """A text field that applies the tracker's fixes the way the OS hooks do."""
+
+    def __init__(self):
+        self.speller = Speller.__new__(Speller)
+        self.speller.__dict__.update(SPELLER.__dict__, user_words=set())
+        self.tracker = Tracker(self.speller)
+        self.text = ""
+
+    def type(self, keys):
+        for ch in keys:
+            if ch == "\b":
+                fix = self.tracker.backspace()
+                if not fix:
+                    self.text = self.text[:-1]
+            else:
+                fix = self.tracker.char(ch)
+                if not fix:
+                    self.text += ch
+            if fix:  # the key was swallowed; send the fix instead
+                self.text = self.text[:len(self.text) - fix.delete] + fix.insert
+        return self
+
+
+class TrackerTest(unittest.TestCase):
+    def test_fixes_on_space(self):
+        self.assertEqual(Box().type("i dont know teh answer ").text, "I don't know the answer ")
+
+    def test_keeps_punctuation(self):
+        self.assertEqual(Box().type("wait, recieve. ").text, "wait, receive. ")
+        self.assertEqual(Box().type("is it wierd? ").text, "is it weird? ")
+
+    def test_nothing_happens_before_space(self):
+        self.assertEqual(Box().type("teh").text, "teh")
+
+    def test_capital_at_sentence_start(self):
+        self.assertEqual(Box().type("Teh end. Teh ").text, "The end. The ")
+
+    def test_backspace_right_after_a_fix_undoes_it(self):
+        box = Box().type("teh \b")
+        self.assertEqual(box.text, "teh")
+        self.assertIn("teh", box.speller.user_words)
+        self.assertEqual(box.type(" ").text, "teh ")  # and it's not fixed again
+
+    def test_backspace_later_is_just_backspace(self):
+        self.assertEqual(Box().type("teh x\b\b").text, "the")
+
+    def test_backspace_edits_are_followed(self):
+        self.assertEqual(Box().type("thw\be ").text, "the ")
+        self.assertEqual(Box().type("hellp\bo wrld ").text, "hello world ")
+
+    def test_links_emails_and_code_are_left_alone(self):
+        for text in ("see example.com/teh ", "mail me@teh ", "my_teh ", "#teh ", "2teh "):
+            self.assertEqual(Box().type(text).text, text)
+
+    def test_unknown_start_skips_short_fragments(self):
+        box = Box()
+        box.tracker.reset(start_known=False)  # e.g. clicked into the middle of a word
+        self.assertEqual(box.type("teh ").text, "teh ")
+
+    def test_paused(self):
+        box = Box()
+        box.tracker.enabled = False
+        self.assertEqual(box.type("teh ").text, "teh ")
+
+    def test_enter_starts_fresh(self):
+        self.assertEqual(Box().type("ok\nteh ").text, "ok\nthe ")
+
+    def test_quotes(self):
+        self.assertEqual(Box().type('he said "teh" ').text, 'he said "the" ')
+
+
+if __name__ == "__main__":
+    unittest.main()
