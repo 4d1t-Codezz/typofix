@@ -29,6 +29,8 @@ ya yah yea yeah nah nope yep yup gonna wanna gotta kinda sorta dunno lemme gimme
 ty thx pls plz hmm hmmm haha hehe wtf tho cuz sus vibe vibes emoji emojis selfie selfies
 google googled googling youtube youtuber instagram tiktok snapchat iphone ipad macbook wifi
 app apps email emails emailed texting texted online covid zoom vs etc
+xml html css json api apis url urls usb pdf pdfs ascii http https www sql ios ui ux gpu cpu
+wifi app github javascript python js ts npm repo repos
 """.split())
 
 # Keyboard rows for spotting fat-finger substitutions (hitting a neighbouring key).
@@ -102,10 +104,37 @@ def _load_typos():
     return typos
 
 
+_OUR_ENDINGS = ("our", "ours", "oured", "ouring", "ourite", "ourites", "ourable", "ourful", "ourless")
+_NOT_BRITISH = {"hour", "four", "your", "tour", "pour", "flour", "sour", "dour", "scour", "devour", "amour",
+                "contour", "detour", "velour", "paramour", "troubadour", "hours", "fours", "yours", "tours",
+                "pours", "flours", "devours", "contours", "detours", "poured", "toured", "soured", "scoured",
+                "devoured", "pouring", "touring", "souring", "scouring", "devouring"}
+_US_EXTRA = {"mom": "mum", "moms": "mums", "mommy": "mummy", "catalog": "catalogue", "dialog": "dialogue",
+             "analog": "analogue", "defense": "defence", "offense": "offence", "license": "licence",
+             "pretense": "pretence", "jewelry": "jewellery", "pajamas": "pyjamas", "aluminum": "aluminium",
+             "skeptic": "sceptic", "skeptical": "sceptical", "plow": "plough", "mold": "mould",
+             "cozy": "cosy", "donut": "doughnut", "tire": "tyre", "tires": "tyres", "gray": "grey",
+             "program": "programme", "programs": "programmes", "check": "cheque"}
+
+
+def _american(word):
+    """The American spelling of a British word, if it's one of the regular patterns."""
+    if word in _NOT_BRITISH:
+        return None
+    for end in _OUR_ENDINGS:
+        if word.endswith(end) and len(word) - len(end) >= 3:
+            return word[:-len(end)] + "or" + end[3:]  # labour -> labor, favourite -> favorite
+    for end, us in (("yse", "yze"), ("ysed", "yzed"), ("yses", "yzes"), ("ysing", "yzing"),
+                    ("tre", "ter"), ("tres", "ters"), ("bre", "ber"), ("bres", "bers")):
+        if word.endswith(end) and len(word) > len(end) + 2:
+            return word[:-len(end)] + us  # analyse -> analyze, theatre -> theater
+    return None
+
+
 def _max_cost(length):
     """How far a word of this length may be from its correction."""
     if length <= 3:
-        return 0.6
+        return 0.8
     if length == 4:
         return 1.0
     if length <= 7:
@@ -118,8 +147,13 @@ def _max_cost(length):
 MARGIN = 0.8
 # One unit of typo_cost is worth this many orders of magnitude of word frequency.
 EDIT_WEIGHT = 3.0
+# People rarely get the first letter wrong, so changing it costs extra (unless two letters swapped).
+FIRST_LETTER = 0.3
+# How much the previous word counts when ranking fixes ("hwo are" -> how, "hwo is" -> who).
+CONTEXT = 0.6
 
-_REPEATS = re.compile(r"(.)\1\1")  # sooo, yesss: stretched on purpose
+_STRETCHED = re.compile(r"(.)\1\1+$|(.)\2\2\2")  # sooo, yesss, cooool: stretched on purpose
+_TRIPLE = re.compile(r"(.)\1\1")
 _LAUGH = re.compile(r"^(?:[ha]*h[ae]h[ha]*|(?:he)+h?|lo+l)$")
 
 # A known word with one of these attached is a real word the list happens to lack (unhabitual,
@@ -139,6 +173,13 @@ class Speller:
             for line in f:
                 word, _, count = line.partition(" ")
                 self.counts[word] = int(count)
+        self._add_american_spellings()
+        self.total = sum(self.counts.values())
+        self.bigrams = {}
+        with gzip.open(os.path.join(DATA, "bigrams.txt.gz"), "rt", encoding="utf-8") as f:
+            for line in f:
+                pair, _, count = line.rpartition(" ")
+                self.bigrams[pair] = int(count)
         self.typos = _load_typos()
         self.user_words = {w.lower() for w in user_words}
         self._lock = threading.Lock()
@@ -156,6 +197,25 @@ class Speller:
                     self.index[key] = [bucket, word]
                 else:
                     bucket.append(word)
+
+    def _add_american_spellings(self):
+        """The list leans British (labour, favourite) and lacks many American forms, so the
+        American spelling of every regular pattern counts as just as common."""
+        extra = {}
+        for word, count in self.counts.items():
+            us = _american(word)
+            if us is None and word.endswith(("lled", "lling", "ller", "llers")):
+                stem = word[:word.rindex("ll") + 1]  # travelled -> travel, if that's a word
+                if len(stem) >= 5 and stem in self.counts:
+                    us = stem + word[len(stem) + 1:]
+            if us and us not in self.counts:
+                extra[us] = count
+        for us, uk in _US_EXTRA.items():
+            if us not in self.counts and uk in self.counts:
+                extra[us] = self.counts[uk]
+        self.counts.update(extra)
+        # Keep the list in order of how common each word is; the index and COMMON_WORDS rely on it.
+        self.counts = dict(sorted(self.counts.items(), key=lambda kv: -kv[1]))
 
     # -- the user's own words (learned when they undo a fix, or added in the window)
     def learn(self, word):
@@ -190,8 +250,17 @@ class Speller:
                     return True
         return False
 
-    def suggest(self, lw):
-        """The best correction for a lowercase unknown word, or None if nothing is clearly best."""
+    def _likelihood(self, cand, prev):
+        """log10 of how often cand appears (after prev, when we know it), on the word-count scale."""
+        count = self.counts[cand]
+        if prev and prev in self.counts:
+            pair = self.bigrams.get(f"{prev} {cand}", 0)
+            return math.log10(CONTEXT * pair * self.total / self.counts[prev] + (1 - CONTEXT) * count)
+        return math.log10(count)
+
+    def suggest(self, lw, prev=None):
+        """The best correction for a lowercase unknown word, or None if nothing is clearly best.
+        prev is the word typed just before it (lowercase), used to break ties."""
         keys = {lw} | _deletes(lw, 2 if len(lw) >= 5 else 1)
         found = set()
         for key in keys:
@@ -210,8 +279,10 @@ class Speller:
             if len(lw) - len(cand) >= 2 and cand in lw:
                 continue  # absolvent isn't a typo of solvent: chopping off letters makes a new word
             cost = typo_cost(lw, cand)
+            if cand[0] != lw[0] and not (len(lw) > 1 and lw[0] == cand[1] and lw[1] == cand[0]):
+                cost += FIRST_LETTER
             if cost <= 2.0:
-                scored.append((math.log10(self.counts[cand]) - EDIT_WEIGHT * cost, cost, cand))
+                scored.append((self._likelihood(cand, prev) - EDIT_WEIGHT * cost, cost, cand))
         if not scored:
             return None
         scored.sort(reverse=True)
@@ -222,7 +293,7 @@ class Speller:
             return None
         return best
 
-    def correct(self, word, sentence_start=True):
+    def correct(self, word, sentence_start=True, prev=None):
         """Returns the corrected word, or None to leave it alone. Keeps the word's capitalisation."""
         lw = word.lower().replace("’", "'")
         if word == "i":
@@ -236,13 +307,22 @@ class Speller:
         if lw in self.typos:
             fixed = self.typos[lw]
         else:
-            if len(lw) < 3 or self.is_known(lw) or _REPEATS.search(lw) or _LAUGH.match(lw):
+            if len(lw) < 3 or self.is_known(lw) or _STRETCHED.search(lw) or _LAUGH.match(lw):
                 return None
+            if _TRIPLE.search(lw):  # worrrying: one key bounced, so drop the extra letter
+                lw = _TRIPLE.sub(r"\1\1", lw)
+                if self.is_known(lw):
+                    fixed = lw
+                    if word[0].isupper():
+                        fixed = fixed[0].upper() + fixed[1:]
+                    return fixed
             if word[0].isupper() and not sentence_start:
                 return None  # a capitalised unknown word mid-sentence is probably a name
-            fixed = self.suggest(lw)
+            fixed = self.suggest(lw, prev)
             if fixed is None:
                 return None
         if word[0].isupper() and fixed[0].islower():
             fixed = fixed[0].upper() + fixed[1:]
+        if "’" in word:
+            fixed = fixed.replace("'", "’")  # keep the curly apostrophes the app was using
         return fixed if fixed != word else None

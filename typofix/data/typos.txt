@@ -54,6 +54,7 @@ yall -> y'all
 
 # Classic typos
 teh -> the
+yu -> you
 hte -> the
 taht -> that
 thsi -> this

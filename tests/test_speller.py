@@ -33,6 +33,17 @@ class SpellerTest(unittest.TestCase):
             with self.subTest(word=word):
                 self.assertIsNone(SPELLER.correct(word, sentence_start=False))
 
+    def test_american_spellings_are_words(self):
+        for word in ("favorite", "labor", "neighbors", "analyze", "traveled", "theater", "mom", "color"):
+            with self.subTest(word=word):
+                self.assertIsNone(SPELLER.correct(word))
+
+    def test_bounced_key(self):
+        self.check({"worrrying": "worrying", "sooo": None, "yesss": None, "cooool": None})
+
+    def test_previous_word_breaks_ties(self):
+        self.assertEqual(SPELLER.correct("hwo", prev="tell"), "how")
+
     def test_ambiguous_words_are_left_alone(self):
         self.assertIsNone(SPELLER.correct("thnk"))  # think or thank?
 

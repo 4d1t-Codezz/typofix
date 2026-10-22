@@ -5,13 +5,17 @@
 Fixes typos as you type, in every app, the way iMessage does. Type `teh ` and it becomes `the `
 the moment you press space. It works on **macOS** and **Windows**.
 
-- **Fixes as you go.** When you press space, the word you just finished is checked. Typos like
-  `recieve`, `pepole` and `wrld`, and missing apostrophes like `dont` and `im`, get fixed on the spot.
+- **Fixes as you go.** When you press space (or Enter at the end of a message), the word you just
+  finished is checked. Typos like `recieve`, `pepole` and `wrld`, and missing apostrophes like
+  `dont` and `im`, get fixed on the spot.
+- **See it coming.** With previews on, a small bubble by your cursor shows the fix before it
+  happens. Press **Esc** to keep your word instead. You can turn previews off.
 - **Easy to undo.** Didn't want a fix? Press **backspace** right after it. Your word comes back,
   and Typofix remembers it and won't change it again.
-- **Careful.** It only changes a word when one fix is clearly the right one. It leaves alone
-  names, slang (`lol`, `gonna`), acronyms (`NASA`), stretched words (`sooo`), links, emails,
-  `#hashtags` and code.
+- **Careful.** It only changes a word when one fix is clearly the right one, using the word
+  before it to break ties (`hwo are` → *how*). It knows American and British spellings, and it
+  leaves alone names, slang (`lol`, `gonna`), acronyms (`NASA`), stretched words (`sooo`),
+  links, emails, `#hashtags` and code.
 - **Private.** Everything runs on your computer. Nothing you type is saved or sent anywhere.
 
 ## Install
@@ -36,10 +40,17 @@ If macOS says the installer "can't be opened", right-click it, choose **Open**, 
 
 ## Using it
 
-Typofix opens when you log in and runs in the background. Its window shows the last few fixes
-and the words you've told it to leave alone. You can pause it, add your own words (names, slang,
-words from your classes), or turn off opening at login. Closing the window just hides it. To get
-it back, click Typofix in the Dock (Mac) or open it from the Start menu (Windows).
+Typofix opens when you log in and runs in the background. Pick how it shows up under
+**Settings → Live in**:
+
+- **Menu bar** (Mac) or **Tray** (Windows), the default: just a small ✓ icon by the clock.
+  Click it to pause, turn previews on or off, see recent fixes (click one to stop making it), or
+  open the window.
+- **Window**: a regular app with a Dock icon, which shows its window when it opens.
+
+The window shows your recent fixes (hover one and click to keep the word you typed), the
+words it leaves alone (add your own, or click × to remove one), and settings. Closing it just
+hides it.
 
 **Mac tip:** macOS has its own autocorrect, but it only works in some apps. It can stay on. If
 the two ever fight over a word, turn the Mac one off in **System Settings → Keyboard → Text
@@ -54,17 +65,24 @@ Input → Edit → Correct spelling automatically**.
   millisecond. Fixes are ranked by how common the word is and how natural the slip is: hitting a
   neighbouring key, swapping two letters, missing a doubled letter or a vowel. When two fixes are
   about equally likely (`hwo`: *how* or *who*?), the word is left alone.
+- The previous word matters too: a list of 240,000 common word pairs (also from SymSpell)
+  decides close calls, like *how* vs *who* after "tell me".
 - `typofix/tracker.py` follows what you type. It watches keys and clicks, and resets whenever
   the cursor might have moved (a click, an arrow key, a shortcut), so it never edits text it
   hasn't seen.
 - `typofix/platforms/` talks to the OS using only Python's built-in `ctypes`, so there's nothing
   extra to install. On a Mac it uses a Quartz event tap; on Windows, a low-level keyboard hook.
   When a word needs fixing, Typofix holds back that space and sends a few backspaces plus the
-  corrected word instead.
+  corrected word instead. On a Mac, the preview bubble is a native floating panel (so it never
+  steals focus from the app you're typing in), and its position comes from the Accessibility
+  API. On Windows it follows apps that show a standard text cursor, and otherwise sits at the
+  bottom of the screen.
+- `typofix/ui/` is the window, drawn on Tk canvases in the same style as
+  [Docs Typer](https://github.com/4d1t-Codezz/docs-typer).
 
 On a Mac, password fields switch on Secure Input, which hides your keys from every app,
 Typofix included. A fix only ever happens when you press space, so passwords (which almost never
-contain spaces) are safe on Windows too.
+contain spaces) are safe on Windows too. Enter only triggers a fix when the line has a space in it.
 
 ## Development
 
@@ -77,5 +95,6 @@ python3 -m typofix                           # run from source
 python3 scripts/make_icon.py                 # redraw the icons
 ```
 
-The word list is SymSpell's `frequency_dictionary_en_82_765.txt` by Wolf Garbe (MIT license).
+The word lists are SymSpell's `frequency_dictionary_en_82_765.txt` and
+`frequency_bigramdictionary_en_243_342.txt` by Wolf Garbe (MIT license).
 Typofix itself is MIT licensed.
